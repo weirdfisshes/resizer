@@ -15,6 +15,9 @@ from . import models
 
 
 class ImageAPI(rest_framework.views.APIView):
+    """
+    Класс API View для работы с изображениями
+    """
     parser_classes = (rest_framework.parsers.MultiPartParser,)
 
     @drf_yasg.utils.swagger_auto_schema(
@@ -28,6 +31,9 @@ class ImageAPI(rest_framework.views.APIView):
         }
     )
     def post(self, request):
+        """
+        Метод для сжатия изображений
+        """
         serializer = serializers.ResizeImageInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -43,9 +49,12 @@ class ImageAPI(rest_framework.views.APIView):
         name, extension = utils.parse_filename(file.name)
 
         with PIL.Image.open(file) as image:
+            # Высчитаем хэш картинки и попробуем найти картинку по хэшу в БД
             image_hash = hashlib.md5(image.tobytes()).hexdigest()
             resized_image = utils.get_resized_image_or_none(image_hash, width, height)
 
+            # Если не удалось найти изображение (то есть ранее мы его не сжимали),
+            # то сожмем изображение
             if resized_image is not None:
                 result = {'resized_file_path': resized_image}
                 serializer = serializers.ResizeImageOutputSerializer(result)
@@ -66,6 +75,7 @@ class ImageAPI(rest_framework.views.APIView):
         result = {'resized_file_path': resized_file_path}
         serializer = serializers.ResizeImageOutputSerializer(result)
 
+        # Сохраним путь до сжатой картинки в БД
         models.Image.objects.filter(hash=image_hash).update(path=resized_file_path)
 
         resizer.logs.debug(
